@@ -50,7 +50,7 @@ curl http://127.0.0.1:8902/health
 
 | 模型 ID | 实际能力 | 计费建议 |
 |---|---|---|
-| `cloudi-enhance` | 图片增强（上传图 → 高清修复），**免费无墙** | 按 1x 图价 |
+| `cloudi-enhance` | ⚠️ **空实现**：返回原图字节（md5 完全相同），**不要上架** | — |
 | `cloudi-nano-banana` | prompt 文生图（基于底图） | ⚠️ 见「已知限制」#1 |
 | `cloudi-video` | 视频生成 | ❌ 上游已死，勿上架 |
 
@@ -89,17 +89,20 @@ curl http://127.0.0.1:8902/v1/session
 
 ## 五、已知限制（重要）
 
-1. **`cloudi-nano-banana` 文生图当前返回上游 `tokenData=null` 错误**。
+1. **`/image/enhance` 是空实现（实测 md5 校验）**：160×160 模糊图上传后返回的
+   仍是同一张图（尺寸/md5 完全一致），720p 照片同样。worker 只是把图存到 CDN 再回传原 URL，
+   **没有调用任何模型**。→ `cloudi-enhance` 不可上架。
+2. **`cloudi-nano-banana` 文生图当前返回上游 `tokenData=null` 错误**。
    上游 worker 在 upload↔generate 之间有服务端会话绑定，需真机 Frida 抓包补齐
    （x86_64 模拟器被 ndk_translation W^X 限制，frida Java hook 必崩）。
    补齐前该模型不可上架计费。
-2. **IP 信誉墙**：上游 Cloudflare 会拉黑直连 IP（`SSL UNEXPECTED_EOF`）。
+3. **IP 信誉墙**：上游 Cloudflare 会拉黑直连 IP（`SSL UNEXPECTED_EOF`）。
    2API 服务器建议挂出口代理（住宅/机场线路可用；免费代理池过不了 CF）。
    代理环境变量方式：`HTTPS_PROXY=http://127.0.0.1:10808 python demo_server.py 8902`。
-3. **视频已死**：上游返回 `DOMAIN_SUSPENDED`，`cloudi-video` 不要上架。
-4. **配额**：免费设备 5 次/日出图 + 30 coins；`/v1/session/rewarded` 可 +50 coins；
+4. **视频已死**：上游返回 `DOMAIN_SUSPENDED`，`cloudi-video` 不要上架。
+5. **配额**：免费设备 5 次/日出图 + 30 coins；`/v1/session/rewarded` 可 +50 coins；
    每次生成自动注册新设备，额度按设备轮换。
-5. **并发**：设备注册 15 并发 100% 成功；建议 new-api 渠道并发 ≤8，过高触发 CF 断连。
+6. **并发**：设备注册 15 并发 100% 成功；建议 new-api 渠道并发 ≤8，过高触发 CF 断连。
 
 ## 六、生产化建议
 
@@ -108,8 +111,8 @@ curl http://127.0.0.1:8902/v1/session
 | 鉴权 | 2API 前加 nginx 反代 + API key 校验 |
 | 出口 | 常驻住宅代理或机场出口，轮换周期 >1h |
 | 监控 | `/health` 纳入拨测；关注 `aes_key_prefix` 变化（=厂商换密钥） |
-| 模型 | 先只上架 `cloudi-enhance`（稳定），文生图等 tokenData 补齐 |
-| 计费 | enhance 按张计；组价 = 上游免费，纯利润 |
+| 模型 | **当前无可用生成能力**：enhance 空实现、nano-banana 待 tokenData、video 上游死。先用本仓库做协议/设备池能力验证，不建议对外计费上架 |
+| 计费 | 暂无可计费能力；等 tokenData 补齐后按张计 |
 
 ## 七、故障排查
 

@@ -14,7 +14,7 @@ Reverse-engineered **Cloudi AI v1.0.9** (Premium by @ElaMods, actually a **Sola 
 | Headers | `X-Client-Auth` `device-id` `app-user-id` `app-version: 1.0.9` `version-code: 9` `language-code` `app-id` `os-type: android` |
 | Crypto | AES-256-CBC + PKCS7, key 32B / IV 16B (recovered from `libnativelib.so` via capstone: `encryptString(key, iv, pkg)`) |
 
-### Endpoint Map (verified live)
+### Endpoint Map (verified live — status reflects *actual* server behaviour, not just HTTP 200)
 
 | Endpoint | Method | Purpose | Status |
 |---|---|---|---|
@@ -25,7 +25,7 @@ Reverse-engineered **Cloudi AI v1.0.9** (Premium by @ElaMods, actually a **Sola 
 | `/user/appToken` | POST | `access_key` + `secret_key` pair | ✅ |
 | `/genUploadLink` | POST | presigned Wasabi upload URL | ✅ |
 | `/upload/image-v3` | POST multipart | direct image upload → CDN url | ✅ |
-| `/image/enhance` | POST | image enhance — **free, no wall** | ✅ |
+| `/image/enhance` | POST | image enhance — **returns the uploaded image verbatim (no-op)** | ⚠️ 200 but no processing |
 | `/image/prompt` | POST | prompt img2img generation | ⚠️ needs `tokenData` session (see Notes) |
 | `/image/img2img/v2` | POST | styled img2img | ⚠️ server-side style validation |
 | `/video/createTask` | POST multipart | video generation | ❌ upstream `DOMAIN_SUSPENDED` (dead) |
@@ -74,10 +74,11 @@ python stress_test.py 10
 
 ## ⚠️ Notes & Limitations
 
-1. **`/image/prompt` requires a `tokenData` session** — the worker binds upload↔generate via a server-side session row. Recovering it needs a Frida trace on a real ARM64 device (emulator is blocked by ndk_translation W^X — frida Java hooks SIGSEGV).
-2. `Quota limit` from the worker = IP-reputation wall; clean residential/VPN exits work (free proxies do NOT — they fail CF TLS).
-3. Direct connections from burned IPs get CF `SSL UNEXPECTED_EOF`; route through a proxy.
-4. Video generation upstream is dead (`DOMAIN_SUSPENDED`, Vietnamese error).
+1. **`/image/enhance` is a no-op.** Verified with md5 comparison: a 160x160 blurred input comes back byte-identical (same md5, same dimensions) — the worker stores the upload on CDN and returns the original URL without any model inference. Same for a 720p photo. Treat it as an image host, not an enhancer.
+2. **`/image/prompt` requires a `tokenData` session** — the worker binds upload↔generate via a server-side session row. Recovering it needs a Frida trace on a real ARM64 device (emulator is blocked by ndk_translation W^X — frida Java hooks SIGSEGV).
+3. `Quota limit` from the worker = IP-reputation wall; clean residential/VPN exits work (free proxies do NOT — they fail CF TLS).
+4. Direct connections from burned IPs get CF `SSL UNEXPECTED_EOF`; route through a proxy.
+5. Video generation upstream is dead (`DOMAIN_SUSPENDED`, Vietnamese error).
 
 ## Files
 
